@@ -22,3 +22,24 @@ export async function decrypt(session: string | undefined = '') {
     return null;
   }
 }
+
+// JWT（JSON Web Token）は、
+// 「ユーザー情報などを署名付きで安全にやり取りするための文字列トークン形式」です。
+
+// ざっくり特徴はこれです。
+
+// header.payload.signature の3部構成（. 区切り）
+// payload に userId や exp（期限）などを入れる
+// サーバー側の秘密鍵で署名し、改ざん検知できる
+// DBセッションの代わりに、CookieやAuthorizationヘッダーで持たせることが多い
+// 重要ポイント：
+
+// JWTは暗号化されているとは限らない（多くはBase64URLエンコード）
+// なので payload は見える前提で、機密情報は入れない
+// 信頼できるかは署名検証（あなたの jwtVerify）で判断する
+// あなたのコードだと、
+
+// encrypt() で JWT 発行
+// Cookie session に保存
+// decrypt()（実質 verify）で検証して userId を取り出す
+// という、典型的なログインセッション実装になっています。

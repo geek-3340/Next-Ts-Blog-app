@@ -5,11 +5,16 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 export default function SignupPage() {
+
+    // server componentからエラーを受け取るためのstate
     const [error, setError] = useState<string | null>(null);
 
+    // form送信時にserver actionであるsignupを呼び出す関数
     const handleSubmit = async (formData: FormData) => {
-        setError(null);
+        setError(null); // エラーのリセット
         const result = await signup(formData);
+
+        // 返り値が「空ではなく」「errorがある」時にerror stateを更新する
         if (result && result.error) {
             setError(result.error);
         }
@@ -64,6 +69,7 @@ export default function SignupPage() {
                             required
                         />
                     </div>
+                    {/* errorがあれば表示 */}
                     {error && <p className='error-message'>{error}</p>}
                     <button
                         type='submit'

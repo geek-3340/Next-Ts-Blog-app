@@ -1,11 +1,30 @@
+'use client';
+
+import { login } from '@/actions/auth';
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function LoginPage() {
+
+  // server componentからエラーを受け取るためのstate
+const [error, setError] = useState<string | null>(null);
+
+// form送信時にserver actionであるloginを呼び出す関数
+const handleSubmit = async (formData: FormData) => {
+  setError(null); // エラーのリセット
+  const result = await login(formData);
+
+  // 返り値が「空ではなく」「errorがある」時にerror stateを更新する
+  if (result && result.error) {
+      setError(result.error);
+  }
+};
+
   return (
     <div className='container' style={{ maxWidth: '400px', marginTop: '50px' }}>
       <div className='card'>
         <h2 style={{ marginBottom: '20px', textAlign: 'center' }}>ログイン</h2>
-        <form>
+        <form action={handleSubmit}>
           <div className='form-group'>
             <label className='form-label' htmlFor='email'>
               メールアドレス
@@ -32,7 +51,7 @@ export default function LoginPage() {
               required
             />
           </div>
-          {/* {error && <p className='error-message'>{error}</p>} */}
+          {error && <p className='error-message'>{error}</p>}
           <button
             type='submit'
             className='btn'
@@ -44,7 +63,7 @@ export default function LoginPage() {
         <p style={{ textAlign: 'center', fontSize: '14px' }}>
           アカウントをお持ちでないですか？
           <br />
-          <Link href='#' style={{ color: '#0070f3' }}>
+          <Link href='/signup' style={{ color: '#0070f3' }}>
             新規登録はこちら
           </Link>
         </p>
