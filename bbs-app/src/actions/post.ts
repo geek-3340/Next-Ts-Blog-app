@@ -1,87 +1,128 @@
-// 'use server';
+'use server';
 
-// import { redirect } from 'next/navigation';
-// import { revalidateTag, cacheTag } from 'next/cache';
-// import { AppDataSource, getRepository } from '@/utils/data-source';
-// import { Post } from '@/entities/Post';
-// import { verifySession } from '@/utils/session';
-// import { User } from '@/entities/User';
+import { redirect } from 'next/navigation';
+import { revalidateTag, cacheTag } from 'next/cache';
+import { AppDataSource, getRepository } from '@/utils/data-source';
+import { Post } from '@/entities/Post';
+import { verifySession } from '@/utils/session';
+import { User } from '@/entities/User';
+import { error } from 'console';
+import { NextRequest } from 'next/server';
+import { decrypt } from '@/utils/jwt';
 
-// export async function createPost(formData: FormData) {
-//   try {
-//     const postRepository = await getRepository(Post);
-//     const userRepository = await getRepository(User);
+export async function createPost(formData: FormData) {
+    const title = formData.get('title') as string;
+    const content = formData.get('content') as string;
 
-//     // ユーザーの取得（リレーションのため）
-//     const user = await userRepository.findOneBy({ id: Number(session.userId) });
-//     if (!user) {
-//       return { error: 'ユーザーが見つかりません' };
-//     }
+    if (!title || !content) {
+        return { error: 'タイトルと本文を入力してください' };
+    }
 
-//     const newPost = postRepository.create({
-//       title,
-//       content,
-//       user: user, // ユーザーオブジェクトをセット
-//     });
+    try {
+        const session = await verifySession();
+        if (!session || !session.userId) {
+            return { error: 'ログインしてください' };
+        }
+        const postRepository = await getRepository(Post);
+        const userRepository = await getRepository(User);
 
-//     await postRepository.save(newPost);
-//   } catch (e) {
-//     console.error(e);
-//     return { error: '投稿の作成中にエラーが発生しました' };
-//   }
-// }
+        // ユーザーの取得（リレーションのため）
+        const user = await userRepository.findOneBy({
+            id: Number(session.userId),
+        });
+        if (!user) {
+            return { error: 'ユーザーが見つかりません' };
+        }
 
-// export async function getPosts() {
-//   const postRepository = await getRepository(Post);
+        const newPost = postRepository.create({
+            title,
+            content,
+            user: user, // ユーザーオブジェクトをセット
+        });
 
-//   // 投稿一覧を取得（作成日時の降順）
-//   const posts = await postRepository.find({
-//     relations: {
-//       user: true,
-//     },
-//     order: {
-//       createdAt: 'DESC',
-//     },
-//   });
+        await postRepository.save(newPost);
+    } catch (e) {
+        console.error(e);
+        return { error: '投稿の作成中にエラーが発生しました' };
+    }
 
-//   return posts.map((post) => ({
-//     ...post,
-//     user: { ...post.user },
-//   }));
-// }
+    revalidateTag('posts', 'max');
+    redirect('/');
+}
 
-// export async function getPost(id: number) {
-//   const postRepository = await getRepository(Post);
+export async function getPosts() {
+    'use cache';
+    cacheTag('posts');
 
-//   const post = await postRepository.findOne({
-//     where: { id },
-//     relations: {
-//       user: true,
-//     },
-//   });
+    const postRepository = await getRepository(Post);
 
-//   if (!post) return null;
-//   return {
-//     ...post,
-//     user: { ...post.user },
-//   };
-// }
+    // 投稿一覧を取得（作成日時の降順）
+    const posts = await postRepository.find({
+        relations: {
+            user: true,
+        },
+        order: {
+            createdAt: 'DESC',
+        },
+    });
 
-// export async function deletePost(id: number) {
-//   const postRepository = await getRepository(Post);
-//   const post = await postRepository.findOne({
-//     where: { id },
-//     relations: { user: true },
-//   });
+    return posts.map((post) => ({
+        ...post,
+        user: { ...post.user },
+    }));
+}
 
-//   if (!post) {
-//     return { error: '投稿が見つかりません' };
-//   }
+export async function getPost(id: number) {
+    'use cache';
+    cacheTag(`post-${id}`);
 
-//   // 本人の投稿か確認
-//   if (post.user.id !== Number(session.userId)) {
-//     return { error: '削除権限がありません' };
-//   }
+    const postRepository = await getRepository(Post);
 
-//   await postRepository.remove(post);
-// }
+    // この時点、postの型はPostとなっており、見た目はオブジェクトでもクラスのインスタンス
+    // server componentで意図しないエラーを防ぐために、プレーンオブジェクトにした方が安全
+    const post = await postRepository.findOne({
+        where: { id },
+        relations: {
+            user: true,
+        },
+    });
+
+    // {スプレッド構文}でプレーン化できる
+    // このplainPostの型を見るとプレーンオブジェクトとなっていることが分かる
+    const plainPost = { ...post };
+
+    if (!post) return null;
+    return {
+        // 以下のスプレッド構文はプレーン化の意図がある！！！
+        ...post,
+        user: { ...post.user },
+    };
+}
+
+export async function deletePost(id: number) {
+    const session = await verifySession();
+    if (!session || !session.userId) {
+        return { error: 'ログインしてください' };
+    }
+
+    const postRepository = await getRepository(Post);
+    const post = await postRepository.findOne({
+        where: { id },
+        relations: { user: true },
+    });
+
+    if (!post) {
+        return { error: '投稿が見つかりません' };
+    }
+
+    // 本人の投稿か確認
+    if (post.user.id !== Number(session.userId)) {
+        return { error: '削除権限がありません' };
+    }
+
+    await postRepository.remove(post);
+
+    revalidateTag('posts', 'max');
+    revalidateTag(`posts-${id}`, 'max');
+    redirect('/');
+}
