@@ -14,7 +14,7 @@ export default await function PostDetailPage({
             style={{ maxWidth: '800px', marginTop: '30px' }}
         >
             <Link
-                href='#'
+                href='/'
                 style={{
                     display: 'inline-block',
                     marginBottom: '20px',

@@ -76,3 +76,8 @@ export async function login(formData: FormData) {
     }
     redirect('/');
 }
+
+export async function logout() {
+    await deleteSession();
+    redirect('/login');
+}
